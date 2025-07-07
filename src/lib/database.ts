@@ -555,6 +555,9 @@ export const isDatabaseInitialized = () => {
   return isInitialized;
 };
 
+// Export the db variable for direct access if needed
+export { db };
+
 // Database API
 export const dbAPI = {
   // Login
