@@ -2985,3 +2985,6 @@ export const dbAPI = {
     return importDatabase(file);
   }
 };
+
+// Export db as an alias to dbAPI for backward compatibility
+export const db = dbAPI;
