@@ -2985,4 +2985,4 @@ export const dbAPI = {
 };
 
 // Export db as an alias to dbAPI for backward compatibility
-export const db = dbAPI;
+export { dbAPI as db };
