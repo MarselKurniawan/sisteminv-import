@@ -2982,3 +2982,6 @@ export const dbAPI = {
     return importDatabase(file);
   }
 };
+
+// Export db for compatibility with existing imports
+export { dbAPI as db };
