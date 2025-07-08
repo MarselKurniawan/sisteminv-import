@@ -554,3 +554,415 @@ export const importDatabase = async (file: File) => {
 export const isDatabaseInitialized = () => {
   return isInitialized;
 };
+// Database API object that encapsulates all database interaction functions
+export const dbAPI = {
+  // Helper functions
+  query,
+  querySingle,
+  execute,
+  insert,
+  
+  // Cities
+  getCities: () => query('SELECT * FROM cities ORDER BY name'),
+  addCity: (name: string) => insert('INSERT INTO cities (name) VALUES (?)', [name]),
+  updateCity: (id: number, name: string) => execute('UPDATE cities SET name = ? WHERE id = ?', [name, id]),
+  deleteCity: (id: number) => execute('DELETE FROM cities WHERE id = ?', [id]),
+  
+  // Price Areas
+  getPriceAreas: () => query('SELECT * FROM price_areas ORDER BY name'),
+  addPriceArea: (name: string) => insert('INSERT INTO price_areas (name) VALUES (?)', [name]),
+  updatePriceArea: (id: number, name: string) => execute('UPDATE price_areas SET name = ? WHERE id = ?', [name, id]),
+  deletePriceArea: (id: number) => execute('DELETE FROM price_areas WHERE id = ?', [id]),
+  
+  // Stores
+  getStores: () => query(`
+    SELECT s.*, c.name as city_name 
+    FROM stores s 
+    LEFT JOIN cities c ON s.city_id = c.id 
+    ORDER BY s.name
+  `),
+  addStore: (store: any) => insert(`
+    INSERT INTO stores (
+      name, address, city_id, contact_billing_name, contact_billing_phone,
+      contact_purchasing_name, contact_purchasing_phone, contact_store_name, contact_store_phone
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    store.name, store.address, store.city_id, store.contact_billing_name, store.contact_billing_phone,
+    store.contact_purchasing_name, store.contact_purchasing_phone, store.contact_store_name, store.contact_store_phone
+  ]),
+  updateStore: (id: number, store: any) => execute(`
+    UPDATE stores SET 
+      name = ?, address = ?, city_id = ?, contact_billing_name = ?, contact_billing_phone = ?,
+      contact_purchasing_name = ?, contact_purchasing_phone = ?, contact_store_name = ?, contact_store_phone = ?
+    WHERE id = ?
+  `, [
+    store.name, store.address, store.city_id, store.contact_billing_name, store.contact_billing_phone,
+    store.contact_purchasing_name, store.contact_purchasing_phone, store.contact_store_name, store.contact_store_phone, id
+  ]),
+  deleteStore: (id: number) => execute('DELETE FROM stores WHERE id = ?', [id]),
+  
+  // Products
+  getProducts: () => query('SELECT * FROM products ORDER BY name'),
+  addProduct: (product: any) => insert(`
+    INSERT INTO products (name, packaging, size, type, product_type, stock, minimum_stock, base_price, hpp_price)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    product.name, product.packaging, product.size, product.type, product.product_type,
+    product.stock, product.minimum_stock, product.base_price, product.hpp_price
+  ]),
+  updateProduct: (id: number, product: any) => execute(`
+    UPDATE products SET 
+      name = ?, packaging = ?, size = ?, type = ?, product_type = ?, 
+      stock = ?, minimum_stock = ?, base_price = ?, hpp_price = ?
+    WHERE id = ?
+  `, [
+    product.name, product.packaging, product.size, product.type, product.product_type,
+    product.stock, product.minimum_stock, product.base_price, product.hpp_price, id
+  ]),
+  deleteProduct: (id: number) => execute('DELETE FROM products WHERE id = ?', [id]),
+  
+  // Product Area Prices
+  getProductAreaPrices: (productId: number) => query(`
+    SELECT pap.*, pa.name as area_name 
+    FROM product_area_prices pap
+    LEFT JOIN price_areas pa ON pap.price_area_id = pa.id
+    WHERE pap.product_id = ?
+  `, [productId]),
+  setProductAreaPrice: (productId: number, areaId: number, price: number) => {
+    const existing = querySingle('SELECT id FROM product_area_prices WHERE product_id = ? AND price_area_id = ?', [productId, areaId]);
+    if (existing) {
+      return execute('UPDATE product_area_prices SET price = ? WHERE product_id = ? AND price_area_id = ?', [price, productId, areaId]);
+    } else {
+      return insert('INSERT INTO product_area_prices (product_id, price_area_id, price) VALUES (?, ?, ?)', [productId, areaId, price]);
+    }
+  },
+  
+  // Package Items
+  getPackageItems: (packageId: number) => query(`
+    SELECT pi.*, p.name as product_name 
+    FROM package_items pi
+    LEFT JOIN products p ON pi.product_id = p.id
+    WHERE pi.package_id = ?
+  `, [packageId]),
+  addPackageItem: (packageId: number, productId: number, quantity: number) => insert(`
+    INSERT INTO package_items (package_id, product_id, quantity) VALUES (?, ?, ?)
+  `, [packageId, productId, quantity]),
+  updatePackageItem: (id: number, quantity: number) => execute('UPDATE package_items SET quantity = ? WHERE id = ?', [quantity, id]),
+  deletePackageItem: (id: number) => execute('DELETE FROM package_items WHERE id = ?', [id]),
+  
+  // Store Deliveries
+  getStoreDeliveries: () => query(`
+    SELECT sd.*, s.name as store_name 
+    FROM store_deliveries sd
+    LEFT JOIN stores s ON sd.store_id = s.id
+    ORDER BY sd.delivery_date DESC
+  `),
+  addStoreDelivery: (delivery: any) => insert(`
+    INSERT INTO store_deliveries (
+      store_id, delivery_date, invoice_date, billing_date, status, price_markup,
+      discount, shipping_cost, total_amount, notes, show_discount_in_print, show_shipping_in_print
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    delivery.store_id, delivery.delivery_date, delivery.invoice_date, delivery.billing_date,
+    delivery.status, delivery.price_markup, delivery.discount, delivery.shipping_cost,
+    delivery.total_amount, delivery.notes, delivery.show_discount_in_print, delivery.show_shipping_in_print
+  ]),
+  updateStoreDelivery: (id: number, delivery: any) => execute(`
+    UPDATE store_deliveries SET 
+      store_id = ?, delivery_date = ?, invoice_date = ?, billing_date = ?, status = ?, price_markup = ?,
+      discount = ?, shipping_cost = ?, total_amount = ?, notes = ?, show_discount_in_print = ?, show_shipping_in_print = ?
+    WHERE id = ?
+  `, [
+    delivery.store_id, delivery.delivery_date, delivery.invoice_date, delivery.billing_date,
+    delivery.status, delivery.price_markup, delivery.discount, delivery.shipping_cost,
+    delivery.total_amount, delivery.notes, delivery.show_discount_in_print, delivery.show_shipping_in_print, id
+  ]),
+  deleteStoreDelivery: (id: number) => execute('DELETE FROM store_deliveries WHERE id = ?', [id]),
+  
+  // Individual Deliveries
+  getIndividualDeliveries: () => query('SELECT * FROM individual_deliveries ORDER BY purchase_date DESC'),
+  addIndividualDelivery: (delivery: any) => insert(`
+    INSERT INTO individual_deliveries (
+      customer_name, customer_contact, purchase_date, status, price_markup,
+      discount, shipping_cost, total_amount, notes, show_discount_in_print, show_shipping_in_print
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    delivery.customer_name, delivery.customer_contact, delivery.purchase_date, delivery.status,
+    delivery.price_markup, delivery.discount, delivery.shipping_cost, delivery.total_amount,
+    delivery.notes, delivery.show_discount_in_print, delivery.show_shipping_in_print
+  ]),
+  updateIndividualDelivery: (id: number, delivery: any) => execute(`
+    UPDATE individual_deliveries SET 
+      customer_name = ?, customer_contact = ?, purchase_date = ?, status = ?, price_markup = ?,
+      discount = ?, shipping_cost = ?, total_amount = ?, notes = ?, show_discount_in_print = ?, show_shipping_in_print = ?
+    WHERE id = ?
+  `, [
+    delivery.customer_name, delivery.customer_contact, delivery.purchase_date, delivery.status,
+    delivery.price_markup, delivery.discount, delivery.shipping_cost, delivery.total_amount,
+    delivery.notes, delivery.show_discount_in_print, delivery.show_shipping_in_print, id
+  ]),
+  deleteIndividualDelivery: (id: number) => execute('DELETE FROM individual_deliveries WHERE id = ?', [id]),
+  
+  // Delivery Items
+  getDeliveryItems: (deliveryType: string, deliveryId: number) => query(`
+    SELECT di.*, p.name as product_name 
+    FROM delivery_items di
+    LEFT JOIN products p ON di.product_id = p.id
+    WHERE di.delivery_type = ? AND di.delivery_id = ?
+  `, [deliveryType, deliveryId]),
+  addDeliveryItem: (item: any) => insert(`
+    INSERT INTO delivery_items (
+      delivery_type, delivery_id, product_id, quantity, unit_price, total_price, price_type, area_price_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    item.delivery_type, item.delivery_id, item.product_id, item.quantity,
+    item.unit_price, item.total_price, item.price_type, item.area_price_id
+  ]),
+  updateDeliveryItem: (id: number, item: any) => execute(`
+    UPDATE delivery_items SET 
+      quantity = ?, unit_price = ?, total_price = ?, price_type = ?, area_price_id = ?
+    WHERE id = ?
+  `, [item.quantity, item.unit_price, item.total_price, item.price_type, item.area_price_id, id]),
+  deleteDeliveryItem: (id: number) => execute('DELETE FROM delivery_items WHERE id = ?', [id]),
+  
+  // Returns
+  getReturns: () => query('SELECT * FROM returns ORDER BY return_date DESC'),
+  addReturn: (returnData: any) => insert(`
+    INSERT INTO returns (delivery_type, delivery_id, return_date, reason, return_location, status, total_amount)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `, [
+    returnData.delivery_type, returnData.delivery_id, returnData.return_date,
+    returnData.reason, returnData.return_location, returnData.status, returnData.total_amount
+  ]),
+  updateReturn: (id: number, returnData: any) => execute(`
+    UPDATE returns SET 
+      return_date = ?, reason = ?, return_location = ?, status = ?, total_amount = ?
+    WHERE id = ?
+  `, [returnData.return_date, returnData.reason, returnData.return_location, returnData.status, returnData.total_amount, id]),
+  deleteReturn: (id: number) => execute('DELETE FROM returns WHERE id = ?', [id]),
+  
+  // Return Items
+  getReturnItems: (returnId: number) => query(`
+    SELECT ri.*, p.name as product_name 
+    FROM return_items ri
+    LEFT JOIN products p ON ri.product_id = p.id
+    WHERE ri.return_id = ?
+  `, [returnId]),
+  addReturnItem: (item: any) => insert(`
+    INSERT INTO return_items (return_id, product_id, quantity, unit_price, total_price)
+    VALUES (?, ?, ?, ?, ?)
+  `, [item.return_id, item.product_id, item.quantity, item.unit_price, item.total_price]),
+  updateReturnItem: (id: number, item: any) => execute(`
+    UPDATE return_items SET quantity = ?, unit_price = ?, total_price = ? WHERE id = ?
+  `, [item.quantity, item.unit_price, item.total_price, id]),
+  deleteReturnItem: (id: number) => execute('DELETE FROM return_items WHERE id = ?', [id]),
+  
+  // Employees
+  getEmployees: () => query('SELECT * FROM employees ORDER BY name'),
+  addEmployee: (employee: any) => insert(`
+    INSERT INTO employees (name, position, base_salary, base_overtime, contact, address, hire_date, birth_date, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    employee.name, employee.position, employee.base_salary, employee.base_overtime,
+    employee.contact, employee.address, employee.hire_date, employee.birth_date, employee.status
+  ]),
+  updateEmployee: (id: number, employee: any) => execute(`
+    UPDATE employees SET 
+      name = ?, position = ?, base_salary = ?, base_overtime = ?, contact = ?, 
+      address = ?, hire_date = ?, birth_date = ?, status = ?
+    WHERE id = ?
+  `, [
+    employee.name, employee.position, employee.base_salary, employee.base_overtime,
+    employee.contact, employee.address, employee.hire_date, employee.birth_date, employee.status, id
+  ]),
+  deleteEmployee: (id: number) => execute('DELETE FROM employees WHERE id = ?', [id]),
+  
+  // Payrolls
+  getPayrolls: () => query(`
+    SELECT p.*, e.name as employee_name 
+    FROM payrolls p
+    LEFT JOIN employees e ON p.employee_id = e.id
+    ORDER BY p.period DESC
+  `),
+  addPayroll: (payroll: any) => insert(`
+    INSERT INTO payrolls (
+      employee_id, period, attendance_days, overtime_days, base_salary, base_overtime,
+      additional_amount, additional_description, additional_show_in_print,
+      deduction_amount, deduction_description, deduction_show_in_print, total_salary
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    payroll.employee_id, payroll.period, payroll.attendance_days, payroll.overtime_days,
+    payroll.base_salary, payroll.base_overtime, payroll.additional_amount, payroll.additional_description,
+    payroll.additional_show_in_print, payroll.deduction_amount, payroll.deduction_description,
+    payroll.deduction_show_in_print, payroll.total_salary
+  ]),
+  updatePayroll: (id: number, payroll: any) => execute(`
+    UPDATE payrolls SET 
+      employee_id = ?, period = ?, attendance_days = ?, overtime_days = ?, base_salary = ?, base_overtime = ?,
+      additional_amount = ?, additional_description = ?, additional_show_in_print = ?,
+      deduction_amount = ?, deduction_description = ?, deduction_show_in_print = ?, total_salary = ?
+    WHERE id = ?
+  `, [
+    payroll.employee_id, payroll.period, payroll.attendance_days, payroll.overtime_days,
+    payroll.base_salary, payroll.base_overtime, payroll.additional_amount, payroll.additional_description,
+    payroll.additional_show_in_print, payroll.deduction_amount, payroll.deduction_description,
+    payroll.deduction_show_in_print, payroll.total_salary, id
+  ]),
+  deletePayroll: (id: number) => execute('DELETE FROM payrolls WHERE id = ?', [id]),
+  
+  // Raw Materials
+  getRawMaterials: () => query('SELECT * FROM raw_materials ORDER BY name'),
+  addRawMaterial: (material: any) => insert(`
+    INSERT INTO raw_materials (name, category, unit, stock_quantity, unit_cost, supplier, minimum_stock, expiry_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    material.name, material.category, material.unit, material.stock_quantity,
+    material.unit_cost, material.supplier, material.minimum_stock, material.expiry_date
+  ]),
+  updateRawMaterial: (id: number, material: any) => execute(`
+    UPDATE raw_materials SET 
+      name = ?, category = ?, unit = ?, stock_quantity = ?, unit_cost = ?, 
+      supplier = ?, minimum_stock = ?, expiry_date = ?
+    WHERE id = ?
+  `, [
+    material.name, material.category, material.unit, material.stock_quantity,
+    material.unit_cost, material.supplier, material.minimum_stock, material.expiry_date, id
+  ]),
+  deleteRawMaterial: (id: number) => execute('DELETE FROM raw_materials WHERE id = ?', [id]),
+  
+  // Factory Productions
+  getFactoryProductions: () => query(`
+    SELECT fp.*, e.name as employee_name, p.name as product_name 
+    FROM factory_productions fp
+    LEFT JOIN employees e ON fp.employee_id = e.id
+    LEFT JOIN products p ON fp.product_id = p.id
+    ORDER BY fp.production_date DESC
+  `),
+  addFactoryProduction: (production: any) => insert(`
+    INSERT INTO factory_productions (employee_id, product_id, production_date, quantity_produced, notes)
+    VALUES (?, ?, ?, ?, ?)
+  `, [production.employee_id, production.product_id, production.production_date, production.quantity_produced, production.notes]),
+  updateFactoryProduction: (id: number, production: any) => execute(`
+    UPDATE factory_productions SET 
+      employee_id = ?, product_id = ?, production_date = ?, quantity_produced = ?, notes = ?
+    WHERE id = ?
+  `, [production.employee_id, production.product_id, production.production_date, production.quantity_produced, production.notes, id]),
+  deleteFactoryProduction: (id: number) => execute('DELETE FROM factory_productions WHERE id = ?', [id]),
+  
+  // Production Materials
+  getProductionMaterials: (productionId: number) => query(`
+    SELECT pm.*, rm.name as material_name 
+    FROM production_materials pm
+    LEFT JOIN raw_materials rm ON pm.raw_material_id = rm.id
+    WHERE pm.production_id = ?
+  `, [productionId]),
+  addProductionMaterial: (material: any) => insert(`
+    INSERT INTO production_materials (production_id, raw_material_id, quantity_used)
+    VALUES (?, ?, ?)
+  `, [material.production_id, material.raw_material_id, material.quantity_used]),
+  updateProductionMaterial: (id: number, material: any) => execute(`
+    UPDATE production_materials SET quantity_used = ? WHERE id = ?
+  `, [material.quantity_used, id]),
+  deleteProductionMaterial: (id: number) => execute('DELETE FROM production_materials WHERE id = ?', [id]),
+  
+  // Stock Reductions
+  getStockReductions: () => query(`
+    SELECT sr.*, p.name as product_name 
+    FROM stock_reductions sr
+    LEFT JOIN products p ON sr.product_id = p.id
+    ORDER BY sr.date DESC
+  `),
+  addStockReduction: (reduction: any) => insert(`
+    INSERT INTO stock_reductions (product_id, amount, reason, notes, date)
+    VALUES (?, ?, ?, ?, ?)
+  `, [reduction.product_id, reduction.amount, reduction.reason, reduction.notes, reduction.date]),
+  updateStockReduction: (id: number, reduction: any) => execute(`
+    UPDATE stock_reductions SET product_id = ?, amount = ?, reason = ?, notes = ?, date = ? WHERE id = ?
+  `, [reduction.product_id, reduction.amount, reduction.reason, reduction.notes, reduction.date, id]),
+  deleteStockReduction: (id: number) => execute('DELETE FROM stock_reductions WHERE id = ?', [id]),
+  
+  // Product Recipes
+  getProductRecipes: (productId: number) => query(`
+    SELECT pr.*, rm.name as material_name 
+    FROM product_recipes pr
+    LEFT JOIN raw_materials rm ON pr.raw_material_id = rm.id
+    WHERE pr.product_id = ?
+  `, [productId]),
+  addProductRecipe: (recipe: any) => insert(`
+    INSERT INTO product_recipes (product_id, raw_material_id, quantity_needed)
+    VALUES (?, ?, ?)
+  `, [recipe.product_id, recipe.raw_material_id, recipe.quantity_needed]),
+  updateProductRecipe: (id: number, recipe: any) => execute(`
+    UPDATE product_recipes SET quantity_needed = ? WHERE id = ?
+  `, [recipe.quantity_needed, id]),
+  deleteProductRecipe: (id: number) => execute('DELETE FROM product_recipes WHERE id = ?', [id]),
+  
+  // HPP
+  getHPP: (productId: number) => querySingle('SELECT * FROM hpp WHERE product_id = ?', [productId]),
+  setHPP: (hpp: any) => {
+    const existing = querySingle('SELECT id FROM hpp WHERE product_id = ?', [hpp.product_id]);
+    if (existing) {
+      return execute(`
+        UPDATE hpp SET 
+          material_cost = ?, overhead_cost = ?, target_profit_percentage = ?, fee_channel_online = ?,
+          minimum_selling_price = ?, suggested_selling_price = ?, final_selling_price = ?, 
+          online_channel_price = ?, rounding_enabled = ?
+        WHERE product_id = ?
+      `, [
+        hpp.material_cost, hpp.overhead_cost, hpp.target_profit_percentage, hpp.fee_channel_online,
+        hpp.minimum_selling_price, hpp.suggested_selling_price, hpp.final_selling_price,
+        hpp.online_channel_price, hpp.rounding_enabled, hpp.product_id
+      ]);
+    } else {
+      return insert(`
+        INSERT INTO hpp (
+          product_id, material_cost, overhead_cost, target_profit_percentage, fee_channel_online,
+          minimum_selling_price, suggested_selling_price, final_selling_price, online_channel_price, rounding_enabled
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        hpp.product_id, hpp.material_cost, hpp.overhead_cost, hpp.target_profit_percentage, hpp.fee_channel_online,
+        hpp.minimum_selling_price, hpp.suggested_selling_price, hpp.final_selling_price,
+        hpp.online_channel_price, hpp.rounding_enabled
+      ]);
+    }
+  },
+  
+  // Bookkeeping
+  getBookkeepingEntries: () => query('SELECT * FROM bookkeeping_entries ORDER BY date DESC'),
+  addBookkeepingEntry: (entry: any) => insert(`
+    INSERT INTO bookkeeping_entries (date, type, category, description, amount, is_auto)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `, [entry.date, entry.type, entry.category, entry.description, entry.amount, entry.is_auto]),
+  updateBookkeepingEntry: (id: number, entry: any) => execute(`
+    UPDATE bookkeeping_entries SET date = ?, type = ?, category = ?, description = ?, amount = ? WHERE id = ?
+  `, [entry.date, entry.type, entry.category, entry.description, entry.amount, id]),
+  deleteBookkeepingEntry: (id: number) => execute('DELETE FROM bookkeeping_entries WHERE id = ?', [id]),
+  
+  // Assets
+  getAssets: () => query('SELECT * FROM assets ORDER BY name'),
+  addAsset: (asset: any) => insert(`
+    INSERT INTO assets (name, category, purchase_date, purchase_price, useful_life_years, maintenance_cost_yearly, current_value, condition, location, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    asset.name, asset.category, asset.purchase_date, asset.purchase_price, asset.useful_life_years,
+    asset.maintenance_cost_yearly, asset.current_value, asset.condition, asset.location, asset.notes
+  ]),
+  updateAsset: (id: number, asset: any) => execute(`
+    UPDATE assets SET 
+      name = ?, category = ?, purchase_date = ?, purchase_price = ?, useful_life_years = ?,
+      maintenance_cost_yearly = ?, current_value = ?, condition = ?, location = ?, notes = ?
+    WHERE id = ?
+  `, [
+    asset.name, asset.category, asset.purchase_date, asset.purchase_price, asset.useful_life_years,
+    asset.maintenance_cost_yearly, asset.current_value, asset.condition, asset.location, asset.notes, id
+  ]),
+  deleteAsset: (id: number) => execute('DELETE FROM assets WHERE id = ?', [id]),
+  
+  // Admin Settings
+  getAdminSettings: () => querySingle('SELECT * FROM admin_settings WHERE id = 1'),
+  updateAdminSettings: (settings: any) => execute(`
+    UPDATE admin_settings SET 
+      pin = ?, locked_menus = ?, hidden_menus = ?, menu_pins = ?, profile = ?, users = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = 1
+  `, [settings.pin, settings.locked_menus, settings.hidden_menus, settings.menu_pins, settings.profile, settings.users])
+};
